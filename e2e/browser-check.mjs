@@ -5,7 +5,8 @@
  *   npm run build
  *   npm i -D playwright && npx playwright install chromium   (최초 1회)
  * 실행:
- *   node e2e/browser-check.mjs
+ *   node e2e/browser-check.mjs                                (루트에 서비스)
+ *   E2E_BASE_PATH=/ai-webapp-lab/ node e2e/browser-check.mjs  (GitHub Pages 하위 경로 검증)
  *
  * 검증 항목: 등록 / 빈 입력 방지 / 수정 / 완료 토글 / 삭제 / 새로고침 후 유지 / localStorage 내용
  * 결과: e2e/screenshots/*.png 캡처 + 콘솔 로그. 실패 시 exit code 1.
@@ -16,11 +17,12 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 
 const root = fileURLToPath(new URL('../dist', import.meta.url));
 const shotDir = fileURLToPath(new URL('./screenshots', import.meta.url));
 const PORT = 4183;
+// GitHub Pages 프로젝트 사이트처럼 하위 경로에 올린 빌드를 검증하려면 E2E_BASE_PATH=/ai-webapp-lab/ 로 실행한다.
+const BASE_PATH = `/${(process.env.E2E_BASE_PATH ?? '').replace(/^\/+|\/+$/g, '')}`; // '/' 또는 '/ai-webapp-lab'
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -37,8 +39,24 @@ if (!existsSync(join(root, 'index.html'))) {
   process.exit(1);
 }
 
+// Playwright는 이 저장소의 의존성에 넣지 않았다(선택 도구). 없으면 설치 방법을 알려 주고 끝낸다.
+let chromium;
+try {
+  ({ chromium } = await import('playwright'));
+} catch {
+  console.error(
+    'playwright를 찾을 수 없습니다. 브라우저 E2E는 선택 검증이므로 아래처럼 설치한 뒤 실행하세요.\n' +
+      '  npm i -D playwright\n' +
+      '  npx playwright install chromium',
+  );
+  process.exit(1);
+}
+
 const server = createServer(async (req, res) => {
-  const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '/');
+  let urlPath = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '/');
+  if (BASE_PATH !== '/' && urlPath.startsWith(BASE_PATH)) {
+    urlPath = urlPath.slice(BASE_PATH.length) || '/';
+  }
   const relative = normalize(urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, ''));
   const filePath = join(root, relative);
   try {
@@ -51,9 +69,20 @@ const server = createServer(async (req, res) => {
 });
 
 await new Promise((resolve) => server.listen(PORT, '127.0.0.1', resolve));
-const base = `http://127.0.0.1:${PORT}/`;
+const base = `http://127.0.0.1:${PORT}${BASE_PATH === '/' ? '/' : `${BASE_PATH}/`}`;
 
-const browser = await chromium.launch({ headless: true });
+let browser;
+try {
+  browser = await chromium.launch({ headless: true });
+} catch (error) {
+  console.error(
+    'Chromium 실행 파일을 열지 못했습니다. 아래 명령으로 브라우저를 설치한 뒤 다시 실행하세요.\n' +
+      '  npx playwright install chromium',
+  );
+  console.error(String(error?.message ?? error).split('\n')[0]);
+  server.close();
+  process.exit(1);
+}
 const context = await browser.newContext({ viewport: { width: 1100, height: 900 }, deviceScaleFactor: 2 });
 const page = await context.newPage();
 const errors = [];

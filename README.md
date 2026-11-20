@@ -3,7 +3,7 @@
 React + TypeScript + Vite로 만든 **할 일 관리(To-Do) 테스트 웹앱**입니다.
 로그인·서버·DB·API 키 없이 브라우저 `localStorage`에만 데이터를 저장하며, 새로고침해도 목록이 유지됩니다.
 
-- 저장소: 비공개 GitHub 저장소 `ai-webapp-lab`
+- 저장소: GitHub 저장소 `ai-webapp-lab` (현재 Private)
 - 작업 브랜치: `feat/ai-webapp-lab`
 - 라이브 데모: 없음(정적 호스팅 미배포). 아래 실행 방법으로 로컬에서 확인합니다.
 
@@ -64,6 +64,8 @@ npm i -D playwright
 npx playwright install chromium
 npm run build
 node e2e/browser-check.mjs   # 성공 시 e2e/screenshots/*.png 캡처
+# 하위 경로(GitHub Pages 프로젝트 사이트) 배포 형태 검증:
+E2E_BASE_PATH=/ai-webapp-lab/ node e2e/browser-check.mjs
 ```
 
 ## 프로젝트 구조
@@ -71,7 +73,8 @@ node e2e/browser-check.mjs   # 성공 시 e2e/screenshots/*.png 캡처
 ```
 ai-webapp-lab/
 ├── index.html                 # 진입 HTML (#root, lang="ko")
-├── vite.config.ts             # Vite + Vitest 설정 (jsdom, setup 파일)
+├── vite.config.ts             # Vite + Vitest 설정 (jsdom, setup 파일, base: './')
+├── ci/deploy-pages.yml        # GitHub Actions 배포 워크플로 원본(.github/workflows/로 옮기면 활성화)
 ├── tsconfig.json              # 엄격한 TS 설정
 ├── src/
 │   ├── main.tsx               # React 루트 렌더링 (StrictMode)
@@ -110,6 +113,27 @@ ai-webapp-lab/
 `node e2e/browser-check.mjs` — 실제 Chromium(프로덕션 빌드) 9개 항목 통과
 최초 로드 → 등록 2건 → 빈 입력 차단 → 수정 → 완료 토글 → **새로고침 후 유지(localStorage 2건, 완료 상태 유지)** → 필터 → 삭제 후 새로고침에도 삭제 유지 → 콘솔 오류 0건
 
+## 배포 (GitHub Pages)
+
+서버·DB가 없는 정적 사이트이므로 `dist/`만 올리면 됩니다. `vite.config.ts`의 `base: './'` 덕분에
+루트(Cloudflare Pages·Vercel·Netlify)와 하위 경로(GitHub Pages 프로젝트 사이트) 어디에 올려도 자산 경로가 맞습니다.
+(하위 경로 형태는 `E2E_BASE_PATH=/ai-webapp-lab/`로 브라우저 E2E까지 검증했습니다.)
+
+배포 방식은 둘 중 하나를 고르며, 둘 다 저장소 소유자가 GitHub 웹에서 1회 설정합니다.
+
+**A. GitHub Actions (권장)** — `main`에 푸시할 때마다 타입 검사 → 테스트 → 빌드 → 배포가 자동 실행됩니다.
+
+1. `ci/deploy-pages.yml` 내용을 `.github/workflows/deploy.yml`로 추가
+   (GitHub 웹에서 새 파일로 붙여넣거나, Workflows 권한이 있는 자격증명으로 `git mv` 후 푸시)
+2. **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 선택
+
+**B. 브랜치 배포** — 워크플로 없이 `dist/`를 `gh-pages` 브랜치에 올리고,
+**Settings → Pages → Source**를 **Deploy from a branch** → `gh-pages` /(root)로 선택
+
+공통 사전 조건: 저장소를 **Public**으로 전환해야 합니다(GitHub Free 개인 계정은 Private 저장소에 Pages를 쓸 수 없음).
+
+배포 주소: `https://<owner>.github.io/ai-webapp-lab/` (모바일 브라우저에서도 동일 주소로 접속)
+
 ## 보안·개인정보
 
 - API 키, 비밀번호, 토큰, 개인정보를 코드·설정에 포함하지 않았습니다.
@@ -121,3 +145,4 @@ ai-webapp-lab/
 
 - 데이터는 브라우저 단위라서 기기·브라우저 간 동기화가 없고, 시크릿 모드나 사이트 데이터 삭제 시 사라집니다.
 - 다중 사용자·권한·서버 백업은 지원하지 않습니다(테스트 웹앱 범위).
+- 브라우저 E2E(`e2e/browser-check.mjs`)용 Playwright는 저장소 의존성에 포함하지 않았습니다(선택 도구). 없이 실행하면 설치 명령을 안내하고 종료합니다.

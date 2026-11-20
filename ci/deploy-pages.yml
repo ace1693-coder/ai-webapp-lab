@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+# main 브랜치에 푸시되면 자동으로 빌드·테스트 후 GitHub Pages에 배포하는 워크플로 원본이다.
+# 이 저장소에 연결된 GitHub App은 워크플로 파일을 직접 푸시할 수 없어(workflows 권한 없음) ci/에 두었다.
+# 활성화 방법(둘 중 하나):
+#   - GitHub 웹에서 새 파일 .github/workflows/deploy.yml 을 만들어 이 파일 내용을 붙여넣는다.
+#   - Workflows 권한이 있는 자격증명으로: git mv ci/deploy-pages.yml .github/workflows/deploy.yml && git push
+# 사전 조건(저장소 소유자 1회 설정):
+#   1) 저장소를 Public으로 전환 (GitHub Free 개인 계정은 Private 저장소에 Pages를 쓸 수 없음)
+#   2) Settings → Pages → Build and deployment → Source: "GitHub Actions"
+# 배포 주소: https://<owner>.github.io/<repository>/
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포는 동시에 하나만 진행하고, 진행 중인 배포는 취소하지 않는다.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
