@@ -1,0 +1,31 @@
+# 빌드 산출물
+dist/
+dist2/
+*.local
+
+# 의존성
+node_modules/
+.pnpm-store/
+
+# 테스트 산출물
+coverage/
+e2e/screenshots/
+e2e/screenshots/failed.png
+
+# 로그·에디터·OS
+*.log
+npm-debug.log*
+.vite/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# 환경변수·비밀값 (절대 커밋 금지)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
